@@ -53,8 +53,6 @@ Dependencies: none
 1d. Litter_ODE_Sims.m
 Script for plotting the dynamics of the full continuous-time model where both litter and resources are dynamic. Parameters are distinguished by environmental parameters (S, c, and r), species responses to litter and resources (L* and R*), and species effects (m, v, and a). 
 
-Figure 4 is created from this script.
-
 Dependencies: viridis.m and Litter_Resources_ODE.m
 
 
@@ -99,7 +97,7 @@ Dependencies: viridis.m, a color palette function.
 
 Code that produces invasion boundaries in the phase space of annual and perennial maximum fitness. This script creates figure 2 in the main text. It is comprised of two parts. The first part shows how the coexistence region changes with the sign and magnitude of a tradeoff between species in sensitivity to litter, given fixed litter production. The second shows the effect of decomposition on the coexistence region. 
 
-Dependencies: viridis.m and APL_BothLitter_Producers_Sim.m
+Dependencies: viridis.m and APL_Sim_Tree.m
 
 
 
@@ -113,6 +111,7 @@ Dependencies: none
 
 ***** 3. Code for fitting the model to data *****
 
+3. Micro_Elymus_Comparison.mlx
 This is a Matlab live script (.mlx) giving the entire analysis. The identical code is presented as supplementary material S6.
 
 Dependencies: viridis.m and LitterEq.m
