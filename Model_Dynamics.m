@@ -26,8 +26,8 @@ clc
 % This is a vector for creating figures in lambdaP vs lambdaA space
 lambda = linspace(1,10,100);
 % Parameters shared across all simulations
-alpha = 1;     bA_d = 50; bP_d = 0;
-
+alpha = 1;     bA_d = 50; bP_d = 0; BT = 0;
+alphaA = alpha; alphaPprime = alpha;
 
 %% Create figures 5a and 5b
 
@@ -45,19 +45,16 @@ for j = 1:2
     
     %% Analytical Calculation for equilibrium litter
     % Calculate the equilibrium L*
-    LeqA = -(1/betaA + bA_d*(1/alpha))/2 + sqrt(...
-        (1/betaA + bA_d*(1/alpha))^2/4 + bA_d*(lambda-1)/(betaA*alpha));
+    LeqA = LitterEq(lambda, alphaA, betaA, bA_d, BT);
     
-    LeqP = -(1/betaP + bP_d*(1/alpha))/2 + sqrt(...
-        (1/betaP + bP_d*(1/alpha))^2/4 + bP_d*(lambda-1)/(betaP*alpha));
-    
+    LeqP = LitterEq(lambda, alphaPprime, betaP, bP_d, BT);
     
     % Calculate the invasion boundaries for each species
     lambdaAinv = lambda.*(1+betaA*LeqP)./(1+betaP*LeqP);
     lambdaPinv = lambda.*(1+betaP*LeqA)./(1+betaA*LeqA);
     
     % Make figures
-    labl = {'(a)', '(b)'};
+    labl = {'a', 'b'};
     % Set colors
     figure(1)
     subplot(3,2,j)
@@ -67,10 +64,10 @@ for j = 1:2
     hold off
     axis([1,max(lambda),1,max(lambda)]);
     ax = gca; ax.FontSize = 25; ax.FontName = 'Times New Roman';
-    ax.XTick = 1:2:max(lambda); ax.YTick = 1:2:max(lambda);
+    ax.XTick = 0:20:max(lambda); ax.YTick = 0:20:max(lambda);
     xlabel('\it\lambda_A'); ylabel('\it\lambda_P');
     pan_labl = text(0,1,labl(j), 'Units', 'normalized');
-    set(pan_labl, 'FontSize', 30); set(pan_labl, 'FontName', 'Times New Roman');
+    set(pan_labl, 'FontSize', 40); set(pan_labl, 'FontName', 'Helvetica');
     set(pan_labl, 'VerticalAlignment', 'bottom');
     set(pan_labl, 'HorizontalAlignment', 'right');
     
@@ -102,7 +99,10 @@ x = viridis(4);
 colors = x(2:3,:);
 
 % General Parameters
-gen = [200,700]; d = 0.01;
+gen = [1100,2200]; d = 0.01;
+
+% Invasion times of anual for priority effect case
+inv_steps = 500;
 
 % Cases
 % a. Stable Coexistence
@@ -113,7 +113,7 @@ cases = 4; indx = [3,4,5,6]; %indx here is a plotting parameter
 % Figure labels
 title_str = {'{\itN_A} excludes {\itN_P}','{\itN_P} excludes {\itN_A}', ...
     'Stable Coexistence', 'Priority Effect'};
-subplot_str = {'(c)', '(d)', '(e)', '(f)'};
+subplot_str = {'c', 'd', 'e', 'f'};
 
 % Setting the specific parameters to use in the 4 cases
 lambdaA = 7*ones(1,4); lambdaP = [4, 8, 5.5, 8];
@@ -124,11 +124,11 @@ sA = 0.9;   gA = 0.09;   eA = 1;
 bA = 0.5;   alphaA = 1;
 
 % Perennial Parameters
-sP = 0.2;   s = 0.2;    f = 0.1;    gP = 0.8;   eP = 0.8;
+sP = 0.2;   p2 = 0.2;    p1 = 1;   f = 0.1;    gP = 0.8;   eP = 0.8;
 bP = 0;     alphaP = 1; gamma = 0.1;
 
 % Calculate the stable stage distribution for the perennial
-ssd = (1-s)/(gP*eP);
+ssd = (1-p2)/(p1*gP*eP);
 
 % Initial Conditions
 % Each row represents the different panels in teh figure
@@ -147,12 +147,12 @@ for i = 1:cases
 
     % Calculate seed yield values
     yA = lambdaA(i)*(1 - sA*(1-gA))/(gA*eA);
-    yP = lambdaP(i)*(1 - sP*(1-gP))/(gP*eP*(f + 1/(1-s)));
+    yP = lambdaP(i)*(1 - sP*(1-gP))/(gP*eP*(f + p1/(1-p2)));
     
     % Collect all the parameters into vectors to pass into simulation
     % function
-    S = [sA, sP, s];    y = [yA, yP*f, yP];     g = [gA, gP];   e = [eA, eP];
-    decay = [bA, bP, d];   alpha = [alphaA, gamma*alphaP, alphaP];
+    S = [sA, sP, p1, p2];    y = [yA, yP, f];     g = [gA, gP];   e = [eA, eP];
+    decay = [bA, bP, d, BT];   alpha = [alphaA, alphaP, gamma];
     beta = [betaA(i), betaP(i)];
     
     % Collect all parameters together
@@ -162,40 +162,39 @@ for i = 1:cases
     clear NA L NP
     
     % Run the simulation before the other species is introduced
-    sys = APL_BothLitter_Producers_Sim(gen(1), init_cond1(i,:), parameters);
+    res_sys = APL_Sim_Tree(gen(1), init_cond1(i,:), parameters);
     
     % Specify output back into NA, L, and NP
-    NA = sys(1,:); L = sys(2,:);    NP = sum(sys(3:4,:));
+    NA = res_sys(1,:); L = res_sys(2,:);    NP = sum(res_sys(3:4,:));
 
     % Specify which species is introduced second in each case
     % If it is case b (i.e., i == 2), the perennial is introduced second.
     % Otherwise the annual is introduced first. Introduction density is
     % exp(-2).
     if any(i == 2)
-        NPinit = exp(-1)/2*[1, gP*eP/(1-s)/(1+betaP(i)*L(end))];
-        init2 = [sys(1:2,end)', NPinit];
+        NPinit = exp(-1)/2*[1, gP*eP*p1/(1-p2)/(1+betaP(i)*res_sys(2,end))];
+        init2 = [res_sys(1:2,end)', NPinit];
     else
-        NAinit = exp(-2);       Linit = 0;
-        init2 = [NAinit, Linit, sys(3:4,end)'];
+        NAinit = exp(-2);
+        init2 = [NAinit, res_sys(2:4,end)'];
     end
     
     % Run the simulation once the second species is introduced
-    sys = APL_BothLitter_Producers_Sim(gen(2)-gen(1), init2, parameters);
-    
-    % Compile the dynamics since introduction of the second species and the
-    % dynamics prior to the introduction of the second species into a
-    % single vector of dynamics for each species.
-    newNA = sys(1,2:end); newNP = sum(sys(3:4,2:end)); newL = sys(2,2:end);
-    NA = [NA, newNA]; L = [L,newL]; NP = [NP, newNP];
-        
-    % If it is case d (priority effects) run another set of simulations
-    % with a second introduction with NA = exp(-0.5) at the second
-    % introduction.
     if i == 4
-        sys = APL_BothLitter_Producers_Sim(400, [exp(-0.5), sys(2:4,400)'], parameters);
-        NA = [NA(1:600), sys(1,2:end)]; L = [L(1:600), sys(2,2:end)];
-        NP = [NP(1:600), sum(sys(3:4,2:end))];
+        first_intro_sys = APL_Sim_Tree(gen(2)-gen(1)-inv_steps, init2, parameters);
+        
+        second_intro_sys = APL_Sim_Tree(inv_steps, ...
+        [exp(-0.5), first_intro_sys(2:4,end)'], parameters);
+                
+        full_sys = [res_sys, first_intro_sys, second_intro_sys];
+        
+    else
+        first_intro_sys = APL_Sim_Tree(gen(2)-gen(1), init2, parameters);
+        full_sys = [res_sys, first_intro_sys];
     end
+        
+    
+    full_sys = [full_sys(1:2,:); sum(full_sys(3:4,:))];
     
     % Plot the dynamics as different panels
     figure(1)
@@ -203,27 +202,27 @@ for i = 1:cases
 
     % Plotting specifics for case where perennial excludes annual
     if i == 2
-        p(1) = plot(NA); hold on; 
-        p(2) = plot((gen(1)+1):gen(2), NP(gen(1):gen(2)-1));
-        l = plot(L, '--', 'Color', 'black');
+        p(1) = plot(full_sys(1,:)); hold on; 
+        p(2) = plot((gen(1)+1):gen(2), full_sys(3,gen(1)+1:gen(2)));
+        l = plot(full_sys(2,:), '--', 'Color', 'black');
         hold off;
     end
     % Plotting specifics for case where there are priority effects
     if i == 4
-        p(1) = plot(gen(1)+1:length(NA), NA(gen(1)+1:length(NA)));
+        p(1) = plot(gen(1)+1:gen(2), full_sys(1,gen(1)+1:gen(2)));
         hold on;
-        p(2) = plot(NP);
-        l = plot((gen(1)+1):length(L), L(gen(1)+1:length(L)), '--', 'Color', 'black');
-        xline(600, ':', 'HandleVisibility', 'off');
+        p(2) = plot(full_sys(3,:));
+        l = plot(full_sys(2,:), '--', 'Color', 'black');
+        xline(gen(2)-inv_steps, ':', 'HandleVisibility', 'off');
         hold off;
     end
     
     % Plotting specifics for case a and c annual excludes perennial and
     % when species stably coexist
     if any(i == [1,3])
-        p(1) = plot((gen(1)+1):gen(2), NA(gen(1):gen(2)-1)); hold on; 
-        p(2) = plot(NP);
-        l = plot((gen(1)+1):gen(2), L(gen(1):gen(2)-1), '--', 'Color', 'black');
+        p(1) = plot((gen(1)+1):gen(2), full_sys(1,gen(1)+1:gen(2))); hold on; 
+        p(2) = plot(full_sys(3,:));
+        l = plot(full_sys(2,:), '--', 'Color', 'black');
         hold off;
     end
     
@@ -232,8 +231,13 @@ for i = 1:cases
     l.LineWidth = 3;        xline(gen(1),':', 'HandleVisibility', 'off');
     hold off
     xlabel('Year {\itt}'); ylabel('Density'); title(title_str(i));
+    if i == 4
+        axis([1000, gen(2), 0, 1.05*max(max(full_sys))])
+    else
+        axis([1000, gen(1)+inv_steps, 0, 1.05*max(max(full_sys))])
+    end
     ax = gca; ax.FontSize = 20; ax.FontName = 'Times New Roman';
     tx = text(-0.16,1.05, subplot_str(i), 'Units', 'normalized');
-    tx.FontName = 'Times New Roman'; tx.FontSize = 30;
+    tx.FontName = 'Helvetica'; tx.FontSize = 40;
     
 end
