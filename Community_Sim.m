@@ -17,13 +17,13 @@ beta = [betaA; betaP*ones(n,1)];
 rho = exp(-4); % Niche overlap among the perennials
 
 % Mean fitness of perennials and a measure of variability across species.
-lambda_mean = 5; lambda_var = 1;
+R0_mean = 5; R0_var = 1;
 
 % Annual Fitness
-lambda_A = lambda_mean*30;
+R0_A = R0_mean*30;
 
 % Perennial Fitness
-lambda_P = lambda_mean*exp(linspace(-lambda_var,lambda_var,n));
+R0_P = R0_mean*exp(linspace(-R0_var,R0_var,n));
 
 % Distribution of litter production
 b = 1*[1, 0.01*linspace(0,1,n)];
@@ -31,13 +31,13 @@ d = linspace(0.001,1,32);
 
 % Fitness Parameters for the Annual
 eA = 1; gA = 1; sA = 0.5;
-yA = lambda_A*(1 - sA*(1-gA))/(gA*eA);
+yA = R0_A*(1 - sA*(1-gA))/(gA*eA);
 
 % Fitness Parameters for the Perennial
 eP = 0.5; gP = 0.5; sP = 0.5;
-f = 0.1;  p1 = 1; p2 = 0.2;
-gamma = 0.1;
-yP = lambda_P*(1 - sP*(1-gP))/(gP*eP*(f + p1/(1 - p2)));
+f = 0.1;  pS = 1; pP = 0.2;
+gamma = 0.1;    delta = 1 - (1-pP)/pS;
+yP = R0_P*(1 - sP*(1-gP))/(gP*eP*(f + pS/(1 - pP)));
 
 % Competitive effects;
 alpha_A = 0.2;
@@ -57,23 +57,23 @@ A = [alpha_A, A_AP; A_PA, A_PP];
 % greater than 1. The distribution of ratios is symmetric on the log scale
 % and so this is sufficient information to describe the entire distribution
 % of fitness ratios for all species pairs.
-fitness_inequal = reshape(lambda_P'*(1./lambda_P),1, []);
+fitness_inequal = reshape(R0_P'*(1./R0_P),1, []);
 fitness_inequal = fitness_inequal(fitness_inequal > 1);
 
 
-% Make figure S2 in the supplement
+% Make figure S4 in the supplement
 figure(1)
 
-%subplot(1,2,1)
+subplot(1,2,1)
 % Distribution of species fitnesses
-scatter([lambda_A, lambda_P], b, 200, 'filled', 'CData', [zeros(1,3);viridis(n)])
-xlabel('\it\lambda'); ylabel('\itb');
+scatter([R0_A, R0_P], b, 200, 'filled', 'CData', [zeros(1,3);viridis(n)])
+xlabel('{\itR}_0'); ylabel('\itb');
 axis([1,150,0,1.05])
 ax = gca; ax.FontSize = 30; ax.XTick = [1,5,10,50,100];
 ax.XTickLabel = [1,5,10,50,100];
 set(gca, 'xscale', 'log'); box on;
 title({'Community Fitness', 'and Litter Production'})
-tx = text(lambda_A, b(1), 'Annual  ');
+tx = text(R0_A, b(1), 'Annual  ');
 tx.HorizontalAlignment = 'right';  tx.VerticalAlignment = 'middle';
 tx.FontSize = 30;
 
@@ -82,7 +82,7 @@ tx.HorizontalAlignment = 'right'; tx.VerticalAlignment = 'bottom';
 
 
 axes('Position',[.175 0.35 .175 .25])
-scatter(lambda_P, b(2:end), 100,'filled', 'CData', viridis(n));
+scatter(R0_P, b(2:end), 100,'filled', 'CData', viridis(n));
 set(gca, 'xscale', 'log')
 title('Perennial Community'); box on;
 
@@ -93,9 +93,9 @@ semilogy(rhovec, rhovec, 'Color', 'black', 'LineWidth', 3);
 hold on
 semilogy(rhovec, 1./rhovec, 'Color', 'black', 'LineWidth', 3);
 hold on
-yline(max(lambda_P)/min(lambda_P), ':'); 
-yline(min(lambda_P)/max(lambda_P), ':'); xline(rho, '--'); 
-xlabel('\rho'); ylabel('{\it\lambda_{P_j}}/{\it\lambda_{P_k}}');
+yline(max(R0_P)/min(R0_P), ':'); 
+yline(min(R0_P)/max(R0_P), ':'); xline(rho, '--'); 
+xlabel('\rho'); ylabel('{\itR}_{0{\itP_j}}/{\itR}_{0{\itP_k}}');
 ax = gca; ax.FontSize = 30;
 axis([0,1,1/20,20])
 ax.YTickLabels = 10.^(-1:1);
@@ -120,8 +120,8 @@ for t = 2:gen
         N = [NP(i,:); NS(i,:)];
         M = [sP*(1-gP) + gP*eP*f*yP(i)/C(i,t-1),...
             yP(i)/C(i,t-1);...
-            gP*eP*p1,...
-            p2];
+            gP*eP*pS,...
+            pP];
         N(:,t) = M*N(:,t-1);
         NP(i,t) = N(1,t);   NS(i,t) = N(2,t);
     end
@@ -132,10 +132,11 @@ for t = 2:gen
     
 end
 
-% Plot figure S3 in the supplement
+% Plot figure S4 in the supplement
 figure(2)
 p = semilogy(NP'); set(p, {'Color'}, num2cell(viridis(n),2));
 xlabel('Time'); ylabel('Density');
+xlim([0,200])
 
 %% Run Simulations for the full community
 % Run for different values of decomposition rate, d
@@ -156,17 +157,19 @@ for k = 1:length(d)
     NP(:,1) = rand(n,1);    NS(:,1) = rand(n,1);
     L(1) = 0;               NA(1) = 0;
     D(:,1) = 1 + beta*L(1);
-    Plant_Vec(:,1) = [eA/D(1,1)*gA*NA(1); NP(:,1)];
+    Senesc_Vec(:,1) = [eA/D(1,1)*gA*NA(1);...
+        gP*eP/D(2:end,1)*NS(:,1)*(pS*delta + 1 - pS) + NP(:,1)*(pP*delta + 1 - pP)];
+    
     Comp_Vec(:,1) = [eA/D(1,1)*gA*NA(1); NP(:,1) + gamma*NS(:,1)];
     C(:,1) = 1 + Comp_Vec(:,1)'*A;
     
-    BT = 0;
+    bT = 0;
     
     % Calculate growth rates and population densities each year t
     for t = 2:gen            
         
         % For litter
-        L(t) = L(t-1)*(1-d(k)) + b*Plant_Vec(:,t-1) + BT;
+        L(t) = L(t-1)*(1-d(k)) + b*Senesc_Vec(:,t-1) + bT;
         % For the annual
         NA(t) = NA(t-1)*(sA*(1-gA) + gA*eA/D(1,t-1)*yA/C(1,t-1));
         
@@ -175,8 +178,8 @@ for k = 1:length(d)
             N = [NS(i,:); NP(i,:)];
             M = [sP*(1-gP) + gP*eP*f*yP(i)/(D(i+1,t-1)*C(i+1,t-1)),...
                 yP(i)/C(i+1,t-1);...
-                p1*gP*eP/D(i+1,t-1),...
-                p2];
+                pS*gP*eP/D(i+1,t-1),...
+                pP];
             N(:,t) = M*N(:,t-1);
             NP(i,t) = N(2,t);   NS(i,t) = N(1,t);
         end
@@ -189,8 +192,11 @@ for k = 1:length(d)
         % Calculate intensity of litter (D), intensity of competition (C)
         % and the number of seedlings each year.
         D(:,t) = 1 + beta*L(t);
-        Plant_Vec(:,t) = [eA/D(1,t)*gA*NA(t); NP(:,t)];
-        Comp_Vec(:,t) = [Plant_Vec(1,t); NP(:,t) + gamma*NS(:,t)];
+        Senesc_Vec(:,t) = [eA/D(1,t)*gA*NA(t);... % Annual biomass
+            gP*eP./D(2:end,t).*NS(:,t)*(pS*delta + 1 - pS) + ... % Senesced seedling density
+            NP(:,t)*(pP*delta + 1 - pP)]; % Senesced established density
+
+        Comp_Vec(:,t) = [eA/D(1,t)*gA*NA(t); NP(:,t) + gamma*eP./D(2:end,t)*gP.*NS(:,t)];
         C(:,t) = 1 + Comp_Vec(:,t)'*A;
         
         
@@ -230,12 +236,12 @@ xlabel(tl, 'Time', 'FontSize', 50);
 ylabel(tl, 'Density', 'FontSize', 50);
 
 
-% Calcualte the number of adult plants at the final equilibrium. NA is seed
+% Calculate the number of adult plants at the final equilibrium. NA is seed
 % density, so we have to multiply this by the germination and establishment
 % fractions to get growing plant density.
 NA_Plants = NA_Density*gA*eA./(1 + betaA*L_Biomass);
 
-% Create figure 7 in the main text.
+% Create figure 6 in the main text.
 
 thresh1 = find(Invasive_Diversity>0,1);
 thresh_d1 = mean(d(thresh1-1:thresh1));
