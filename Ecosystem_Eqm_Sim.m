@@ -1,10 +1,10 @@
 clear
 clc
 
-%% Consider Strong and Weak Tradeoffs
+% This code considers three generic outcomes. The first is where there are 
+% priority effects. Annual and perennial have differences in litter production. 
 
-% Strong Tradeoffs
-
+%% Generic Parameters
 % Annual fitness parameters
 R0A = 48;
 
@@ -27,13 +27,6 @@ pS = 0.1;
 pP = 1 - pS/T_P;
 yP = R0P*(1 - sP*(1-gP))/(gP*eP*(f + pS/(1-pP)));
 
-% Litter production parameters
-bA = 0.5; bPprime = 0.1; 
-% Here we choos bPprime, which is a composite parameter that acts just like
-% bA. Once we have chosen bPprime, we choose values of bP and delta that
-% give bPprime (once already choosing T_P above).
-bP = 0.1; delta = bPprime/bP - 1/T_P;
-
 % Competition parameters
 alphaA = 0.1;   alphaPprime = 0.1;
 % Here we fix alphaPprime, which is a composite parameter that acts like
@@ -47,118 +40,165 @@ betaA = 0.13; betaP = 0.05;
 d = linspace(0.001,1,500); 
 bT = 0;
 
+%% bA >> bP (Broad region of stable coexistence)
 
-gen = 100000;
+% Litter production parameters
+bA = 0.5; bPprime = 0.1; 
+% Here we choos bPprime, which is a composite parameter that acts just like
+% bA. Once we have chosen bPprime, we choose values of bP and delta that
+% give bPprime (once already choosing T_P above).
+bP = 0.1; delta = bPprime/bP - 1/T_P;
 
-eqm = zeros(4,length(d));
-
+% Calculate the value of litter where species coexist.
 LeqmCoex = (R0A - R0P)/(betaA*R0P - betaP*R0A);
 
-s = [sA, sP, pS, pP];   y = [yA, yP, f];    g = [gA, gP];
-e = [eA, eP];           alpha = [alphaA, alphaP, gamma];
-beta = [betaA, betaP];
-
-for i = 1:length(d)
-    decay = [bA, bP, d(i), bT, delta];
-    parameters = {s, y, g, e, decay, alpha, beta};
-    
-%    if i == 1
-        init_cond = ones(4,1);
-%    else
-%        init_cond = sys(:,end);
-%    end
-    
-    sys = APL_Sim_Tree(gen, init_cond, parameters);
-    
-    eqm(:,i) = sys(:,end);
-end
-
+% Calculate the critical points of decomposition where invasion of
+% different species occurs. 
 dcritP = 1/LeqmCoex*(bT + bA/alphaA*(R0A/(1 + betaA*LeqmCoex) - 1));
 dcritA = 1/LeqmCoex*(bT + bP*(delta + 1/T_P)/(alphaP*(1+gamma/T_P))*(R0P/(1+betaP*LeqmCoex) - 1));
 
-%% Figures 
+% Given that betaA > betaP, 
+%   the perennial can invade when d < dcritP
+%   the annual can invade when d > dcritA.
+% Therefore, the species coexist over some range of d if dcritP > dcritA
+% This is the case we consider here.
 
+% Plot the 3 outcomes.
+% 1. d < dcritA < dcritP (perennial only)
+dvec1 = linspace(0,dcritA,100);
+for i = 1:length(dvec1)
+    Leqm_NoA(i) = LitterEq(R0P, alphaPprime, betaP, bPprime/dvec1(i), bT/dvec1(i));
+end
 figure
-subplot(1,2,2)
-plot(d, eqm(2,:), 'Color', 'black', 'LineWidth', 3);
+subplot(1,3,3)
+plot(dvec1, Leqm_NoA, 'Color', 'black', 'LineWidth', 3);
+hold on
+
+% 2. dcritA < d < dcritP (coexistence)
+dvec2 = linspace(dcritA,dcritP,100);
+plot(dvec2, LeqmCoex*ones(size(dvec2)), 'Color', 'black', 'LineWidth', 3);
+
+% 3. d > dcritP > dcritA (annual only)
+dvec3 = linspace(dcritP, 1, 100);
+for i = 1:length(dvec1)
+    Leqm_NoP(i) = LitterEq(R0A, alphaA, betaA, bA/dvec3(i), bT/dvec3(i));
+end
+plot(dvec3, Leqm_NoP, 'Color', 'black', 'LineWidth', 3);
+hold off
+
 xlabel('Decomposition Fraction, {\itd}')
 ylabel('Equilbirium Litter Density');
 xline(dcritA, '--');
 xline(dcritP, '--');
 ax = gca; ax.FontSize = 25; ax.FontName = 'Times New Roman';
-
- % Uncomment these lines if you want to see the resident equlibrium litter
- % for each species. They track the simulation results exactly except where
- % the two species coexist.
- 
-% for i = 1:length(d)
-%     Leqm_NoA(i) = LitterEq(R0P, alphaPprime, betaP, bPprime/d(i), bT/d(i));
-%     Leqm_NoP(i) = LitterEq(R0A, alphaA, betaA, bA/d(i), bT/d(i));
-% end
-% 
-% hold on
-% plot(d, Leqm_NoA)
-% plot(d, Leqm_NoP)
-% yline(LeqmCoex)
-% hold off
+xlim([0,1]); ylim([0,150]);
 
 
-%% Weak Tradeoffs
-bPprime = 0.1;
+%% bA == bP (Coexistence region has measure zero)
+
+% For illustrative purposes, make it such that the invasion boundaries are
+% both at d = 0.5.
+
+% Calculate the value of b that gives dcrit = 0.5.
+dcrit = 0.5;
+b = (dcrit*LeqmCoex - bT)*alphaA/(R0A/(1 + betaA*LeqmCoex) - 1);
 
 % Litter production parameters
-bA = 0.1; bP = 0.1; 
-delta = bPprime/bP - 1/T_P;
+bA = b; bPprime = b; 
+% Here we choos bPprime, which is a composite parameter that acts just like
+% bA. Once we have chosen bPprime, we choose values of bP and delta that
+% give bPprime (once already choosing T_P above).
+bP = b; delta = bPprime/bP - 1/T_P;
 
-% Competition parameters
-alphaA = 0.1;   alphaPprime = 0.1;
-alphaP = 0.1; gamma = (alphaPprime/alphaP - 1)*T_P;
-
-eqm = zeros(4,length(d));
-
-s = [sA, sP, pS, pP];   y = [yA, yP, f];    g = [gA, gP];
-e = [eA, eP];           alpha = [alphaA, alphaP, gamma];
-beta = [betaA, betaP];
-
-parfor i = 1:length(d)
-    decay = [bA, bP, d(i), bT, delta];
-    parameters = {s, y, g, e, decay, alpha, beta};
-    
-%    if i == 1
-        init_cond = ones(4,1);
-%    else
-%        init_cond = sys(:,end);
-%    end
-    
-    sys = APL_Sim_Tree(gen, init_cond, parameters);
-    
-    eqm(:,i) = sys(:,end);
-end
-
-%% Figures 
-
+% Calculate the critical points of decomposition where invasion of
+% different species occurs. 
 dcritP = 1/LeqmCoex*(bT + bA/alphaA*(R0A/(1 + betaA*LeqmCoex) - 1));
 dcritA = 1/LeqmCoex*(bT + bP*(delta + 1/T_P)/(alphaP*(1+gamma/T_P))*(R0P/(1+betaP*LeqmCoex) - 1));
 
+% Given that betaA > betaP, 
+%   the perennial can invade when d < dcritP
+%   the annual can invade when d > dcritA.
+% Therefore, the species coexist over some range of d if dcritP > dcritA
+% In this case, dcritP == dcritA. Therefore, we only have two outcomes
 
-subplot(1,2,1)
-plot(d, eqm(2,:), 'Color', 'black', 'LineWidth', 3);
+% Plot the 2 outcomes.
+% 1. d < dcritA = dcritP (perennial only)
+dvec1 = linspace(0,dcritA,100);
+for i = 1:length(dvec1)
+    Leqm_NoA(i) = LitterEq(R0P, alphaPprime, betaP, bPprime/dvec1(i), bT/dvec1(i));
+end
+
+subplot(1,3,2)
+plot(dvec1, Leqm_NoA, 'Color', 'black', 'LineWidth', 3);
+hold on
+
+% 2. d > dcritP = dcritA (annual only)
+dvec2 = linspace(dcritP, 1, 100);
+for i = 1:length(dvec1)
+    Leqm_NoP(i) = LitterEq(R0A, alphaA, betaA, bA/dvec2(i), bT/dvec2(i));
+end
+plot(dvec2, Leqm_NoP, 'Color', 'black', 'LineWidth', 3);
+hold off
+
 xlabel('Decomposition Fraction, {\itd}')
 ylabel('Equilbirium Litter Density');
+xline(dcritA, '--');
+xline(dcritP, '--');
 ax = gca; ax.FontSize = 25; ax.FontName = 'Times New Roman';
-xline(dcritA, '--')
-xline(dcritP, '--')
+xlim([0,1]); ylim([0,150]);
 
- % Uncomment these lines if you want to see the resident equlibrium litter
- % for each species. They track the simulation results exactly.
- 
-% for i = 1:length(d)
-%     Leqm_NoA(i) = LitterEq(R0P, alphaPprime, betaP, bPprime/d(i), bT/d(i));
-%     Leqm_NoP(i) = LitterEq(R0A, alphaA, betaA, bA/d(i), bT/d(i));
-% end
+%% bA << bP (Broad region of priority effects)
 
-% hold on
-% plot(d, Leqm_NoA)
-% plot(d, Leqm_NoP)
-% yline(LeqmCoex)
-% hold off
+% Litter production parameters
+bA = 0.1; bPprime = 0.5; 
+% Here we choos bPprime, which is a composite parameter that acts just like
+% bA. Once we have chosen bPprime, we choose values of bP and delta that
+% give bPprime (once already choosing T_P above).
+bP = 0.5; delta = bPprime/bP - 1/T_P;
+
+% Calculate the critical points of decomposition where invasion of
+% different species occurs. 
+dcritP = 1/LeqmCoex*(bT + bA/alphaA*(R0A/(1 + betaA*LeqmCoex) - 1));
+dcritA = 1/LeqmCoex*(bT + bP*(delta + 1/T_P)/(alphaP*(1+gamma/T_P))*(R0P/(1+betaP*LeqmCoex) - 1));
+
+% Given that betaA > betaP, 
+%   the perennial can invade when d < dcritP
+%   the annual can invade when d > dcritA.
+% Therefore, the species coexist over some range of d if dcritP > dcritA
+% In this case, dcritA > dcritP. In the region between dcritA and dcritP,
+% neither species can invade the other. This means that there is a priority
+% effect. 
+
+% Plot the 3 outcomes.
+% 1. d < dcritA < dcritP (perennial only)
+dvec1 = linspace(0,dcritP,100);
+for i = 1:length(dvec1)
+    Leqm_NoA(i) = LitterEq(R0P, alphaPprime, betaP, bPprime/dvec1(i), bT/dvec1(i));
+end
+subplot(1,3,1)
+plot(dvec1, Leqm_NoA, 'Color', 'black', 'LineWidth', 3);
+hold on
+
+% 2. dcritP < d < dcritA (priority effect)
+dvec2 = linspace(dcritP,dcritA,100);
+for i = 1:length(dvec2)
+    Leqm_NoP(i) = LitterEq(R0A, alphaA, betaA, bA/dvec2(i), bT/dvec2(i));
+    Leqm_NoA(i) = LitterEq(R0P, alphaPprime, betaP, bPprime/dvec2(i), bT/dvec2(i));
+end
+plot(dvec2, Leqm_NoP, 'Color', 2/3*ones(1,3), 'LineWidth', 3);
+plot(dvec2, Leqm_NoA, 'Color', 2/3*ones(1,3), 'LineWidth', 3);
+
+% 3. d > dcritP > dcritA (annual only)
+dvec3 = linspace(dcritA, 1, 100);
+for i = 1:length(dvec1)
+    Leqm_NoP(i) = LitterEq(R0A, alphaA, betaA, bA/dvec3(i), bT/dvec3(i));
+end
+plot(dvec3, Leqm_NoP, 'Color', 'black', 'LineWidth', 3);
+hold off
+
+xlabel('Decomposition Fraction, {\itd}')
+ylabel('Equilbirium Litter Density');
+xline(dcritA, '--');
+xline(dcritP, '--');
+ax = gca; ax.FontSize = 25; ax.FontName = 'Times New Roman';
+xlim([0,1]); ylim([0,150]);
