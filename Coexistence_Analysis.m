@@ -59,7 +59,6 @@ for i = 1:length(b_ratio_vec)
     % Define bA and bP for each loop
     bA = geo_mean_b*b_ratio_vec(i); bP = geo_mean_b/b_ratio_vec(i);
 
-a;slkdfja ;sdkfjas;dlf 
     
     %% Calculate the equilibrium L* for each species across the range of R0
     
